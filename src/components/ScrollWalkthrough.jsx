@@ -212,13 +212,13 @@ const ScrollWalkthrough = () => {
         });
       });
 
-      // Mobile: CSS sticky handles pinning, we just scrub
+      // Mobile: Pin and scrub (identical to desktop logic, but matched for mobile height)
       mmInstance.add("(max-width: 767px)", () => {
         scrollTriggerInstance = ScrollTrigger.create({
           trigger: triggerRef.current,
+          pin: pinRef.current,
           start: "top top",
           end: "bottom bottom",
-          pin: false, // CSS sticky handles it
           scrub: 0.1,
           onUpdate: (self) => {
             const progress = self.progress;
@@ -272,11 +272,11 @@ const ScrollWalkthrough = () => {
   return (
     <div 
       ref={triggerRef} 
-      className="relative w-full bg-[#FAF8F5] overflow-x-hidden h-[150vh] md:h-[220vh]"
+      className="relative w-full bg-[#FAF8F5] overflow-x-hidden h-[180vh] md:h-[220vh]"
     >
       <div
         ref={pinRef}
-        className="w-full flex flex-col justify-center items-center sticky top-0 h-[100dvh] md:relative md:top-auto md:h-screen pt-14 pb-14 md:pt-0 md:pb-0"
+        className="w-full flex flex-col justify-center items-center h-[100dvh] md:h-screen pt-14 pb-14 md:pt-0 md:pb-0"
       >
       {/* Editorial Content Layout */}
       <div className="w-full max-w-[1400px] mx-auto px-6 md:px-12 flex flex-col md:flex-row items-center justify-between gap-8 md:gap-16 relative z-10 py-12 md:py-16">
