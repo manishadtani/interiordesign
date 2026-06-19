@@ -1,0 +1,109 @@
+@import url('https://fonts.googleapis.com/css2?family=Afacad:wght@400&family=Lora:wght@400;500;600&family=Urbanist:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+/* Custom Font — Lacroom */
+@font-face {
+  font-family: 'Lacroom';
+  src: url('/fonts/Lacroom.woff2') format('woff2'),
+       url('/fonts/Lacroom.woff') format('woff'),
+       url('/fonts/Lacroom.ttf') format('truetype'),
+       url('/fonts/Lacroom.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --background: #FAF8F5;
+  --foreground: #2b2b2b;
+}
+
+@theme {
+  --font-lacroom: 'Lacroom', serif;
+  --font-urbanist: 'Urbanist', sans-serif;
+  --font-lora: 'Lora', serif;
+  --font-afacad: 'Afacad', sans-serif;
+}
+
+/* Smooth scrolling behavior - set to auto to prevent conflicts with Lenis smooth scroll */
+html {
+  scroll-behavior: auto;
+  scroll-padding-top: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  background-color: #FAF8F5;
+}
+
+/* Optimize body for animations */
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #FAF8F5;
+  color: #2b2b2b;
+  overflow-x: hidden;
+}
+
+/* Canvas specific optimizations */
+canvas {
+  display: block;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(178, 0, 10, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(178, 0, 10, 0.6);
+}
+
+/* Loader bar styling */
+.loading-progress-bar {
+  height: 4px;
+  background-color: #b2000a;
+  transition: width 0.3s ease;
+}
+
+/* Cursor trail styling */
+.custom-cursor {
+  width: 20px;
+  height: 20px;
+  border: 1px solid #b2000a;
+  border-radius: 50%;
+  position: fixed;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 9999;
+  transition: width 0.3s, height 0.3s, background-color 0.3s;
+}
+
+.custom-cursor-dot {
+  width: 4px;
+  height: 4px;
+  background-color: #b2000a;
+  border-radius: 50%;
+  position: fixed;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.custom-cursor.hovered {
+  width: 50px;
+  height: 50px;
+  background-color: rgba(178, 0, 10, 0.1);
+  border-color: #b2000a;
+}
