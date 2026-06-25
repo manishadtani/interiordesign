@@ -8,379 +8,538 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 
-// ── Secret Code Vault (4 tabs) ──
+// ── Secret Code Vault (5 tabs) ──
 const SECRET_TABS = [
   {
-    label: 'SmoothScroll.tsx',
-    code: `"use client";
-
-import React, { useEffect } from 'react';
-import Lenis from 'lenis';
-
-interface SmoothScrollProps {
-  children: React.ReactNode;
-}
-
-export default function SmoothScroll({ children }: SmoothScrollProps) {
-  useEffect(() => {
-    const lenis = new Lenis({
-      duration: 1.2,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      orientation: 'vertical',
-      smoothWheel: true,
-    });
-
-    function raf(time: number) {
-      lenis.raf(time);
-      requestAnimationFrame(raf);
-    }
-
-    requestAnimationFrame(raf);
-
-    return () => {
-      lenis.destroy();
-    };
-  }, []);
-
-  return <>{children}</>;
-}`
-  },
-  {
-    label: 'CinematicHero.tsx',
-    code: `"use client";
-import React, { useEffect, useRef, useState } from 'react';
-
-const TOTAL_FRAMES = 192;
-const INITIAL_LOAD_COUNT = 12;
-const MAX_DPR = 1.5;
-
-export default function CinematicHero() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const pinRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [loadProgress, setLoadProgress] = useState<number>(0);
-  const [isReady, setIsReady] = useState<boolean>(false);
-  const framesRef = useRef<Array<HTMLImageElement | undefined>>([]);
-  const lastFrameIndexRef = useRef<number>(-1);
-  const currentFrameIndexRef = useRef<number>(0);
-  const requestRef = useRef<number | null>(null);
-  const unmountedRef = useRef<boolean>(false);
-  const progressRef = useRef<number>(0);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    let loadedCount = 0;
-    const preloadedImages: Array<HTMLImageElement | undefined> = new Array(TOTAL_FRAMES);
-
-    const updateProgress = () => {
-      const percent = Math.round((loadedCount / TOTAL_FRAMES) * 100);
-      if (percent !== progressRef.current) {
-        progressRef.current = percent;
-        setLoadProgress(percent);
-      }
-    };
-
-    const loadImage = (index: number) => {
-      return new Promise<void>((resolve) => {
-        if (unmountedRef.current) return resolve();
-
-        const img = new Image();
-        img.onload = () => {
-          preloadedImages[index] = img;
-          loadedCount += 1;
-          updateProgress();
-          resolve();
-        };
-        img.onerror = () => {
-          console.error(\`Failed to load frame \${index}\`);
-          loadedCount += 1;
-          updateProgress();
-          resolve();
-        };
-        img.src = \`/scroll/1st frame_\${String(index).padStart(5, '0')}.webp\`;
-      });
-    };
-
-    const idle = (callback: () => void) => {
-      if ('requestIdleCallback' in window) {
-        (window as any).requestIdleCallback(callback, { timeout: 200 });
-      } else {
-        window.setTimeout(callback, 200);
-      }
-    };
-
-    const loadBatch = async (startIndex: number, count: number) => {
-      const batch = Array.from(
-        { length: Math.min(count, TOTAL_FRAMES - startIndex) },
-        (_, offset) => startIndex + offset
-      );
-      await Promise.all(batch.map(loadImage));
-    };
-
-    const loadRemaining = async (startIndex: number) => {
-      const batchSize = 6;
-      for (let i = startIndex; i < TOTAL_FRAMES && !unmountedRef.current; i += batchSize) {
-        await new Promise<void>((resolve) => {
-          idle(() => {
-            loadBatch(i, batchSize).then(resolve);
-          });
-        });
-      }
-    };
-
-    const loadImages = async () => {
-      await loadBatch(0, INITIAL_LOAD_COUNT);
-      if (unmountedRef.current) return;
-
-      framesRef.current = preloadedImages;
-      setIsReady(true);
-
-      if (TOTAL_FRAMES > INITIAL_LOAD_COUNT) {
-        loadRemaining(INITIAL_LOAD_COUNT);
-      }
-    };
-
-    loadImages();
-
-    return () => {
-      unmountedRef.current = true;
-      if (requestRef.current !== null) {
-        cancelAnimationFrame(requestRef.current);
-      }
-    };
-  }, []);
-  const drawFrame = (index: number, canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
-    const frameIndex = Math.max(0, Math.min(Math.floor(index), TOTAL_FRAMES - 1));
-    currentFrameIndexRef.current = frameIndex;
-    if (lastFrameIndexRef.current === frameIndex) return;
-    lastFrameIndexRef.current = frameIndex;
-    const img = framesRef.current[frameIndex];
-    if (!img) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const imgRatio = img.width / img.height;
-    const canvasRatio = canvas.width / canvas.height;
-    let dw: number, dh: number, dx: number, dy: number;
-    if (imgRatio > canvasRatio) {
-      dh = canvas.height;
-      dw = dh * imgRatio;
-      dx = (canvas.width - dw) / 2;
-      dy = 0;
-    } else {
-      dw = canvas.width;
-      dh = dw / imgRatio;
-      dx = 0;
-      dy = (canvas.height - dh) / 2;
-    }
-    ctx.drawImage(img, dx, dy, dw, dh);
-  };
-  const setCanvasDimensions = (canvas: HTMLCanvasElement) => {
-    if (!canvas) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-
-    if (framesRef.current[currentFrameIndexRef.current]) {
-      lastFrameIndexRef.current = -1;
-      drawFrame(currentFrameIndexRef.current, canvas, ctx);
-    }
-  };
-  useEffect(() => {
-    if (typeof window === 'undefined' || !isReady) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d', { alpha: false });
-    if (!ctx) return;
-    setCanvasDimensions(canvas);
-    const handleResize = () => setCanvasDimensions(canvas);
-    window.addEventListener('resize', handleResize);
-
-    let gsapContext: any = null;
-    let scrollTriggerInstance: any = null;
-
-    const initGSAP = async () => {
-      const { gsap } = await import('gsap');
-      const { ScrollTrigger } = await import('gsap/ScrollTrigger');
-
-      gsap.registerPlugin(ScrollTrigger);
-      gsapContext = gsap.context(() => {
-        const timeline = gsap.timeline({
-          scrollTrigger: {
-            trigger: containerRef.current,
-            pin: pinRef.current,
-            start: 'top top',
-            end: 'bottom bottom',
-            scrub: true,
-            onUpdate: (self) => {
-              const frameIndex = self.progress * (TOTAL_FRAMES - 1);
-              if (requestRef.current !== null) cancelAnimationFrame(requestRef.current);
-              requestRef.current = requestAnimationFrame(() => drawFrame(frameIndex, canvas, ctx));
-            },
-            onRefresh: () => {
-              setCanvasDimensions(canvas);
-            }
-          }
-        });
-        scrollTriggerInstance = timeline.scrollTrigger;
-      }, containerRef);
-    };
-    initGSAP();
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      scrollTriggerInstance?.kill();
-      gsapContext?.revert();
-    };
-  }, [isReady]);
-  useEffect(() => {
-    if (!isReady || !canvasRef.current) return;
-
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d', { alpha: false });
-    if (!ctx) return;
-
-    lastFrameIndexRef.current = -1;
-    drawFrame(currentFrameIndexRef.current, canvas, ctx);
-
-    let gsapContext: any = null;
-    let cancelled = false;
-
-    import('gsap').then(({ gsap }) => {
-      if (cancelled) return;
-      gsapContext = gsap.context(() => {
-        gsap.fromTo(
-          '.scroll-indicator-container',
-          { opacity: 0, y: 20 },
-          { opacity: 1, y: 0, duration: 1.0, ease: 'power3.out', delay: 0.8 }
-        );
-        gsap.fromTo(
-          '.scroll-indicator-arrow',
-          { y: -3 },
-          { y: 5, duration: 1.0, repeat: -1, yoyo: true, ease: 'power1.inOut', delay: 1.0 }
-        );
-
-        const teaserVal = { frame: 0 };
-        gsap.timeline({ delay: 1.0 })
-          .to(teaserVal, {
-            frame: 16,
-            duration: 1.2,
-            ease: 'power1.out',
-            onUpdate: () => {
-              if (window.scrollY === 0) {
-                drawFrame(teaserVal.frame, canvas, ctx);
-              }
-            }
-          })
-          .to(teaserVal, {
-            frame: 0,
-            duration: 1.0,
-            ease: 'power1.inOut',
-            onUpdate: () => {
-              if (window.scrollY === 0) {
-                drawFrame(teaserVal.frame, canvas, ctx);
-              }
-            }
-          });
-      }, containerRef);
-    });
-
-    return () => {
-      cancelled = true;
-      gsapContext?.revert();
-    };
-  }, [isReady]);
-  return (
-    <section ref={containerRef} className="relative w-full h-[180vh] md:h-[220vh] bg-[#FAF8F5]">
-      <div ref={pinRef} className="w-full h-screen relative overflow-hidden">
-        <div className="absolute inset-0 z-0 select-none pointer-events-none">
-          <canvas
-            ref={canvasRef}
-            className={\`w-full h-full block object-cover transition-opacity duration-1000 \${isReady ? 'opacity-100' : 'opacity-0'}\`}
-            style={{ willChange: 'transform' }}
-          />
-        </div>
-        <div className="scroll-indicator-container absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-10 pointer-events-none" style={{ opacity: 0 }}>
-          <span className="text-[0.65rem] tracking-[0.2em] text-[#8b8b8b] uppercase">Scroll to explore</span>
-          <div className="scroll-indicator-arrow w-[1px] h-10 bg-gradient-to-b from-[#8b8b8b] to-transparent" />
-        </div>
-        {!isReady && (
-          <div className="absolute inset-0 flex flex-col justify-center items-center bg-[#FAF8F5] z-20">
-            <div className="relative w-20 h-20 flex items-center justify-center">
-              <svg className="w-full h-full transform -rotate-90">
-                <circle cx="40" cy="40" r="34" stroke="#E8E3DD" strokeWidth="3" fill="transparent" />
-                <circle
-                  cx="40" cy="40" r="34" stroke="#B2000A" strokeWidth="3" fill="transparent"
-                  strokeDasharray={2 * Math.PI * 34}
-                  strokeDashoffset={(2 * Math.PI * 34) * (1 - loadProgress / 100)}
-                  className="transition-all duration-300"
-                />
-              </svg>
-              <span className="absolute text-xs font-semibold text-[#2b2b2b]">{loadProgress}%</span>
-            </div>
-            <span className="text-xs text-[#8b8b8b] uppercase tracking-[0.2em] mt-4">Loading Walkthrough...</span>
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}`
-  },
-  {
     label: 'layout.tsx',
-    code: `import type { Metadata } from "next";
-import "./globals.css";
-import SmoothScroll from "@/components/SmoothScroll";
-
-export const metadata: Metadata = {
-  title: "Marquis Living | Premium Design",
-  description: "Bespoke luxury architecture & interior design studio",
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <html lang="en">
-      <body className="antialiased">
-        <SmoothScroll>
-          {children}
-        </SmoothScroll>
-      </body>
-    </html>
-  );
-}`
+    code: [
+      'import type { Metadata } from "next";',
+      'import "./globals.css";',
+      'import SmoothScroll from "@/components/SmoothScroll";',
+      '',
+      'export const metadata: Metadata = {',
+      '  title: "Marquis Living | Premium Design",',
+      '  description: "Bespoke luxury architecture & interior design studio",',
+      '};',
+      '',
+      'export default function RootLayout({',
+      '  children,',
+      '}: Readonly<{',
+      '  children: React.ReactNode;',
+      '}>) {',
+      '  return (',
+      '    <html lang="en">',
+      '      <body className="antialiased">',
+      '        <SmoothScroll>',
+      '          {children}',
+      '        </SmoothScroll>',
+      '      </body>',
+      '    </html>',
+      '  );',
+      '}',
+    ].join('\n')
   },
   {
     label: 'page.tsx',
-    code: `import CinematicHero from "@/components/CinematicHero";
-
-export default function Home() {
-  return (
-    <main className="w-full bg-[#FAF8F5]">
-      {/* 1. Cinematic Scroll Canvas Hero */}
-      <CinematicHero />
-
-      {/* 2. Test Content Area */}
-      <section className="w-full h-screen bg-white flex items-center justify-center border-t border-gray-100">
-        <div className="text-center">
-          <h2 className="text-3xl md:text-5xl font-light text-neutral-800 tracking-wider uppercase mb-4">
-            Next Architectural Exhibit
-          </h2>
-          <p className="text-neutral-500 font-light text-sm md:text-base">
-            This space indicates you have scrolled past the pinned canvas gallery.
-          </p>
-        </div>
-      </section>
-    </main>
-  );
-}`
+    code: [
+      'import CinematicHero from "@/components/CinematicHero";',
+      '',
+      'export default function Home() {',
+      '  return (',
+      '    <main className="w-full bg-[#FAF8F5]">',
+      '      {/* 1. Cinematic Scroll Canvas Hero */}',
+      '      <CinematicHero />',
+      '',
+      '      {/* 2. Test Content Area */}',
+      '      <section className="w-full h-screen bg-white flex items-center justify-center border-t border-gray-100">',
+      '        <div className="text-center">',
+      '          <h2 className="text-3xl md:text-5xl font-light text-neutral-800 tracking-wider uppercase mb-4">',
+      '            Next Architectural Exhibit',
+      '          </h2>',
+      '          <p className="text-neutral-500 font-light text-sm md:text-base">',
+      '            This space indicates you have scrolled past the pinned canvas gallery.',
+      '          </p>',
+      '        </div>',
+      '      </section>',
+      '    </main>',
+      '  );',
+      '}',
+    ].join('\n')
+  },
+  {
+    label: 'CinematicHero.tsx',
+    code: [
+      '"use client";',
+      'import React, { useEffect, useRef, useState } from \'react\';',
+      'import dynamic from \'next/dynamic\';',
+      '',
+      'const CinematicHeroMobile = dynamic(() => import(\'./CinematicHeroMobile\'), { ssr: false });',
+      '',
+      'const TOTAL_FRAMES = 192;',
+      'const INITIAL_LOAD_COUNT = 12;',
+      'const MAX_DPR = 1.5;',
+      '',
+      'export default function CinematicHero() {',
+      '  const [isMobile, setIsMobile] = useState<boolean>(false);',
+      '  const containerRef = useRef<HTMLDivElement>(null);',
+      '  const pinRef = useRef<HTMLDivElement>(null);',
+      '  const canvasRef = useRef<HTMLCanvasElement>(null);',
+      '  const [loadProgress, setLoadProgress] = useState<number>(0);',
+      '  const [isReady, setIsReady] = useState<boolean>(false);',
+      '  const framesRef = useRef<Array<HTMLImageElement | undefined>>([]);',
+      '  const lastFrameIndexRef = useRef<number>(-1);',
+      '  const currentFrameIndexRef = useRef<number>(0);',
+      '  const requestRef = useRef<number | null>(null);',
+      '  const unmountedRef = useRef<boolean>(false);',
+      '  const progressRef = useRef<number>(0);',
+      '',
+      '  useEffect(() => {',
+      '    const onResize = () => setIsMobile(window.innerWidth < 768);',
+      '    onResize();',
+      '    window.addEventListener(\'resize\', onResize);',
+      '    return () => window.removeEventListener(\'resize\', onResize);',
+      '  }, []);',
+      '',
+      '  useEffect(() => {',
+      '    if (typeof window === \'undefined\' || isMobile) return;',
+      '',
+      '    let loadedCount = 0;',
+      '    const preloadedImages: Array<HTMLImageElement | undefined> = new Array(TOTAL_FRAMES);',
+      '',
+      '    const updateProgress = () => {',
+      '      const percent = Math.round((loadedCount / TOTAL_FRAMES) * 100);',
+      '      if (percent !== progressRef.current) {',
+      '        progressRef.current = percent;',
+      '        setLoadProgress(percent);',
+      '      }',
+      '    };',
+      '',
+      '    const loadImage = (index: number) => {',
+      '      return new Promise<void>((resolve) => {',
+      '        if (unmountedRef.current) return resolve();',
+      '',
+      '        const img = new Image();',
+      '        img.onload = () => {',
+      '          preloadedImages[index] = img;',
+      '          loadedCount += 1;',
+      '          updateProgress();',
+      '          resolve();',
+      '        };',
+      '        img.onerror = () => {',
+      '          console.error(`Failed to load frame ${index}`);',
+      '          loadedCount += 1;',
+      '          updateProgress();',
+      '          resolve();',
+      '        };',
+      '        img.src = `/scroll/1st frame_${String(index).padStart(5, \'0\')}.webp`;',
+      '      });',
+      '    };',
+      '',
+      '    const idle = (callback: () => void) => {',
+      '      if (\'requestIdleCallback\' in window) {',
+      '        (window as any).requestIdleCallback(callback, { timeout: 200 });',
+      '      } else {',
+      '        setTimeout(callback, 200);',
+      '      }',
+      '    };',
+      '',
+      '    const loadBatch = async (startIndex: number, count: number) => {',
+      '      const batch = Array.from(',
+      '        { length: Math.min(count, TOTAL_FRAMES - startIndex) },',
+      '        (_, offset) => startIndex + offset',
+      '      );',
+      '      await Promise.all(batch.map(loadImage));',
+      '    };',
+      '',
+      '    const loadRemaining = async (startIndex: number) => {',
+      '      const batchSize = 6;',
+      '      for (let i = startIndex; i < TOTAL_FRAMES && !unmountedRef.current; i += batchSize) {',
+      '        await new Promise<void>((resolve) => {',
+      '          idle(() => {',
+      '            loadBatch(i, batchSize).then(resolve);',
+      '          });',
+      '        });',
+      '      }',
+      '    };',
+      '',
+      '    const loadImages = async () => {',
+      '      await loadBatch(0, INITIAL_LOAD_COUNT);',
+      '      if (unmountedRef.current) return;',
+      '',
+      '      framesRef.current = preloadedImages;',
+      '      setIsReady(true);',
+      '',
+      '      if (TOTAL_FRAMES > INITIAL_LOAD_COUNT) {',
+      '        loadRemaining(INITIAL_LOAD_COUNT);',
+      '      }',
+      '    };',
+      '',
+      '    loadImages();',
+      '',
+      '    return () => {',
+      '      unmountedRef.current = true;',
+      '      if (requestRef.current !== null) {',
+      '        cancelAnimationFrame(requestRef.current);',
+      '      }',
+      '    };',
+      '  }, [isMobile]);',
+      '  const drawFrame = (index: number, canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {',
+      '    const frameIndex = Math.max(0, Math.min(Math.floor(index), TOTAL_FRAMES - 1));',
+      '    currentFrameIndexRef.current = frameIndex;',
+      '    if (lastFrameIndexRef.current === frameIndex) return;',
+      '    lastFrameIndexRef.current = frameIndex;',
+      '    const img = framesRef.current[frameIndex];',
+      '    if (!img) return;',
+      '    ctx.clearRect(0, 0, canvas.width, canvas.height);',
+      '    const imgRatio = img.width / img.height;',
+      '    const canvasRatio = canvas.width / canvas.height;',
+      '    let dw: number, dh: number, dx: number, dy: number;',
+      '    if (imgRatio > canvasRatio) {',
+      '      dh = canvas.height;',
+      '      dw = dh * imgRatio;',
+      '      dx = (canvas.width - dw) / 2;',
+      '      dy = 0;',
+      '    } else {',
+      '      dw = canvas.width;',
+      '      dh = dw / imgRatio;',
+      '      dx = 0;',
+      '      dy = (canvas.height - dh) / 2;',
+      '    }',
+      '    ctx.drawImage(img, dx, dy, dw, dh);',
+      '  };',
+      '  const setCanvasDimensions = (canvas: HTMLCanvasElement) => {',
+      '    if (!canvas) return;',
+      '    const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);',
+      '    const rect = canvas.getBoundingClientRect();',
+      '    canvas.width = rect.width * dpr;',
+      '    canvas.height = rect.height * dpr;',
+      '',
+      '    const ctx = canvas.getContext(\'2d\');',
+      '    if (!ctx) return;',
+      '    ctx.imageSmoothingEnabled = true;',
+      '    ctx.imageSmoothingQuality = \'high\';',
+      '',
+      '    if (framesRef.current[currentFrameIndexRef.current]) {',
+      '      lastFrameIndexRef.current = -1;',
+      '      drawFrame(currentFrameIndexRef.current, canvas, ctx);',
+      '    }',
+      '  };',
+      '  useEffect(() => {',
+      '    if (typeof window === \'undefined\' || !isReady) return;',
+      '    const canvas = canvasRef.current;',
+      '    if (!canvas) return;',
+      '    const ctx = canvas.getContext(\'2d\', { alpha: false });',
+      '    if (!ctx) return;',
+      '    setCanvasDimensions(canvas);',
+      '    const handleResize = () => setCanvasDimensions(canvas);',
+      '    window.addEventListener(\'resize\', handleResize);',
+      '',
+      '    let gsapContext: any = null;',
+      '    let scrollTriggerInstance: any = null;',
+      '',
+      '    const initGSAP = async () => {',
+      '      const { gsap } = await import(\'gsap\');',
+      '      const { ScrollTrigger } = await import(\'gsap/ScrollTrigger\');',
+      '',
+      '      gsap.registerPlugin(ScrollTrigger);',
+      '      gsapContext = gsap.context(() => {',
+      '        const timeline = gsap.timeline({',
+      '          scrollTrigger: {',
+      '            trigger: containerRef.current,',
+      '            pin: pinRef.current,',
+      '            start: \'top top\',',
+      '            end: \'bottom bottom\',',
+      '            scrub: true,',
+      '            onUpdate: (self) => {',
+      '              const frameIndex = self.progress * (TOTAL_FRAMES - 1);',
+      '              if (requestRef.current !== null) cancelAnimationFrame(requestRef.current);',
+      '              requestRef.current = requestAnimationFrame(() => drawFrame(frameIndex, canvas, ctx));',
+      '            },',
+      '            onRefresh: () => {',
+      '              setCanvasDimensions(canvas);',
+      '            }',
+      '          }',
+      '        });',
+      '        scrollTriggerInstance = timeline.scrollTrigger;',
+      '      }, containerRef);',
+      '    };',
+      '    initGSAP();',
+      '    return () => {',
+      '      window.removeEventListener(\'resize\', handleResize);',
+      '      scrollTriggerInstance?.kill();',
+      '      gsapContext?.revert();',
+      '    };',
+      '  }, [isReady]);',
+      '  useEffect(() => {',
+      '    if (!isReady || !canvasRef.current) return;',
+      '',
+      '    const canvas = canvasRef.current;',
+      '    const ctx = canvas.getContext(\'2d\', { alpha: false });',
+      '    if (!ctx) return;',
+      '',
+      '    lastFrameIndexRef.current = -1;',
+      '    drawFrame(currentFrameIndexRef.current, canvas, ctx);',
+      '',
+      '    let gsapContext: any = null;',
+      '    let cancelled = false;',
+      '',
+      '    import(\'gsap\').then(({ gsap }) => {',
+      '      if (cancelled) return;',
+      '      gsapContext = gsap.context(() => {',
+      '        gsap.fromTo(',
+      '          \'.scroll-indicator-container\',',
+      '          { opacity: 0, y: 20 },',
+      '          { opacity: 1, y: 0, duration: 1.0, ease: \'power3.out\', delay: 0.8 }',
+      '        );',
+      '        gsap.fromTo(',
+      '          \'.scroll-indicator-arrow\',',
+      '          { y: -3 },',
+      '          { y: 5, duration: 1.0, repeat: -1, yoyo: true, ease: \'power1.inOut\', delay: 1.0 }',
+      '        );',
+      '',
+      '        const teaserVal = { frame: 0 };',
+      '        gsap.timeline({ delay: 1.0 })',
+      '          .to(teaserVal, {',
+      '            frame: 16,',
+      '            duration: 1.2,',
+      '            ease: \'power1.out\',',
+      '            onUpdate: () => {',
+      '              if (window.scrollY === 0) {',
+      '                drawFrame(teaserVal.frame, canvas, ctx);',
+      '              }',
+      '            }',
+      '          })',
+      '          .to(teaserVal, {',
+      '            frame: 0,',
+      '            duration: 1.0,',
+      '            ease: \'power1.inOut\',',
+      '            onUpdate: () => {',
+      '              if (window.scrollY === 0) {',
+      '                drawFrame(teaserVal.frame, canvas, ctx);',
+      '              }',
+      '            }',
+      '          });',
+      '      }, containerRef);',
+      '    });',
+      '',
+      '    return () => {',
+      '      cancelled = true;',
+      '      gsapContext?.revert();',
+      '    };',
+      '  }, [isReady]);',
+      '  if (isMobile) {',
+      '    return <CinematicHeroMobile />;',
+      '  }',
+      '  return (',
+      '    <section ref={containerRef} className="relative w-full h-[180vh] md:h-[220vh] bg-[#FAF8F5]">',
+      '      <div ref={pinRef} className="w-full h-screen relative overflow-hidden">',
+      '        <div className="absolute inset-0 z-0 select-none pointer-events-none">',
+      '          <canvas',
+      '            ref={canvasRef}',
+      '            className={`w-full h-full block object-cover transition-opacity duration-1000 ${isReady ? \'opacity-100\' : \'opacity-0\'}`}',
+      '            style={{ willChange: \'transform\' }}',
+      '          />',
+      '        </div>',
+      '        <div className="scroll-indicator-container absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-10 pointer-events-none" style={{ opacity: 0 }}>',
+      '          <span className="text-[0.65rem] tracking-[0.2em] text-[#8b8b8b] uppercase">Scroll to explore</span>',
+      '          <div className="scroll-indicator-arrow w-[1px] h-10 bg-gradient-to-b from-[#8b8b8b] to-transparent" />',
+      '        </div>',
+      '        {!isReady && (',
+      '          <div className="absolute inset-0 flex flex-col justify-center items-center bg-[#FAF8F5] z-20">',
+      '            <div className="relative w-20 h-20 flex items-center justify-center">',
+      '              <svg className="w-full h-full transform -rotate-90">',
+      '                <circle cx="40" cy="40" r="34" stroke="#E8E3DD" strokeWidth="3" fill="transparent" />',
+      '                <circle',
+      '                  cx="40" cy="40" r="34" stroke="#B2000A" strokeWidth="3" fill="transparent"',
+      '                  strokeDasharray={2 * Math.PI * 34}',
+      '                  strokeDashoffset={(2 * Math.PI * 34) * (1 - loadProgress / 100)}',
+      '                  className="transition-all duration-300"',
+      '                />',
+      '              </svg>',
+      '              <span className="absolute text-xs font-semibold text-[#2b2b2b]">{loadProgress}%</span>',
+      '            </div>',
+      '            <span className="text-xs text-[#8b8b8b] uppercase tracking-[0.2em] mt-4">Loading Walkthrough...</span>',
+      '          </div>',
+      '        )}',
+      '      </div>',
+      '    </section>',
+      '  );',
+      '}',
+    ].join('\n')
+  },
+  {
+    label: 'CinematicHeroMobile.tsx',
+    code: [
+      '"use client";',
+      'import React, { useEffect, useRef, useState } from \'react\';',
+      '',
+      'const TOTAL_MOBILE_FRAMES = 191;',
+      '',
+      'export default function CinematicHeroMobile() {',
+      '  const containerRef = useRef<HTMLDivElement>(null);',
+      '  const canvasRef = useRef<HTMLCanvasElement>(null);',
+      '  const requestRef = useRef<number | null>(null);',
+      '  const framesRef = useRef<Array<HTMLImageElement | undefined>>([]);',
+      '  const [isReady, setIsReady] = useState(false);',
+      '  const [progress, setProgress] = useState(0);',
+      '',
+      '  useEffect(() => {',
+      '    let mounted = true;',
+      '',
+      '    const preload = async () => {',
+      '      const total = TOTAL_MOBILE_FRAMES;',
+      '      if (total <= 0) return;',
+      '      const batch = 6;',
+      '      let loaded = 0;',
+      '      const imgs: Array<HTMLImageElement | undefined> = new Array(total);',
+      '',
+      '      const loadImg = (i: number) => new Promise<void>((resolve) => {',
+      '        const img = new Image();',
+      '        img.onload = () => { imgs[i] = img; loaded += 1; if (mounted && loaded === Math.min(total, 8)) setIsReady(true); resolve(); };',
+      '        img.onerror = () => { loaded += 1; resolve(); };',
+      '        img.src = `/scroll-mobile-frames/mobile-frame_${String(i + 1).padStart(5, \'0\')}.png`;',
+      '      });',
+      '',
+      '      for (let i = 0; i < total; i += batch) {',
+      '        const tasks = [] as Promise<void>[];',
+      '        for (let j = i; j < Math.min(i + batch, total); j++) tasks.push(loadImg(j));',
+      '        // eslint-disable-next-line no-await-in-loop',
+      '        await Promise.all(tasks);',
+      '      }',
+      '',
+      '      framesRef.current = imgs;',
+      '      if (mounted) setIsReady(true);',
+      '    };',
+      '',
+      '    preload();',
+      '    return () => { mounted = false; if (requestRef.current) cancelAnimationFrame(requestRef.current); };',
+      '  }, []);',
+      '',
+      '  // scroll-synced playback: map page scroll over the container to frames',
+      '  useEffect(() => {',
+      '    if (!isReady || !canvasRef.current || !containerRef.current) return;',
+      '    const canvas = canvasRef.current;',
+      '    const ctx = canvas.getContext(\'2d\');',
+      '    if (!ctx) return;',
+      '',
+      '    const setSize = () => {',
+      '      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);',
+      '      const rect = canvas.getBoundingClientRect();',
+      '      canvas.width = rect.width * dpr;',
+      '      canvas.height = rect.height * dpr;',
+      '    };',
+      '    setSize();',
+      '    window.addEventListener(\'resize\', setSize);',
+      '',
+      '    const total = TOTAL_MOBILE_FRAMES;',
+      '',
+      '    const drawFrame = (frameIndexFloat: number) => {',
+      '      const frameIndex = Math.max(0, Math.min(Math.floor(frameIndexFloat), Math.max(0, total - 1)));',
+      '      const img = framesRef.current[frameIndex];',
+      '      if (!img) return;',
+      '      ctx.clearRect(0, 0, canvas.width, canvas.height);',
+      '      const imgRatio = img.width / img.height;',
+      '      const canvasRatio = canvas.width / canvas.height;',
+      '      let dw: number, dh: number, dx: number, dy: number;',
+      '      if (imgRatio > canvasRatio) {',
+      '        dh = canvas.height;',
+      '        dw = dh * imgRatio;',
+      '        dx = (canvas.width - dw) / 2;',
+      '        dy = 0;',
+      '      } else {',
+      '        dw = canvas.width;',
+      '        dh = dw / imgRatio;',
+      '        dx = 0;',
+      '        dy = (canvas.height - dh) / 2;',
+      '      }',
+      '      ctx.drawImage(img, dx, dy, dw, dh);',
+      '    };',
+      '',
+      '    const onScroll = () => {',
+      '      const rect = containerRef.current!.getBoundingClientRect();',
+      '      const containerTop = window.scrollY + rect.top;',
+      '      const containerHeight = rect.height;',
+      '      const viewportH = window.innerHeight;',
+      '',
+      '      const denom = Math.max(1, containerHeight - viewportH);',
+      '      const raw = (window.scrollY - containerTop) / denom;',
+      '      const progress = Math.min(1, Math.max(0, raw));',
+      '        ',
+      '      const frameIndex = progress * (Math.max(0, total - 1));',
+      '      if (requestRef.current !== null) cancelAnimationFrame(requestRef.current);',
+      '      requestRef.current = requestAnimationFrame(() => drawFrame(frameIndex));',
+      '    };',
+      '',
+      '    window.addEventListener(\'scroll\', onScroll, { passive: true });',
+      '    onScroll();',
+      '',
+      '    return () => {',
+      '      window.removeEventListener(\'resize\', setSize);',
+      '      window.removeEventListener(\'scroll\', onScroll);',
+      '      if (requestRef.current) cancelAnimationFrame(requestRef.current);',
+      '    };',
+      '  }, [isReady]);',
+      '',
+      '  return (',
+      '    <section ref={containerRef} className="relative w-full h-[200vh] bg-[#FAF8F5]">',
+      '      <div className="w-full sticky top-0 h-screen relative overflow-hidden">',
+      '        <div className="absolute inset-0 z-0 select-none pointer-events-none">',
+      '          <canvas ref={canvasRef} className={`w-full h-full block object-cover transition-opacity duration-500 ${isReady ? \'opacity-100\' : \'opacity-0\'}`} style={{ willChange: \'transform\' }} />',
+      '        </div>',
+      '        {!isReady && (',
+      '          <div className="absolute inset-0 flex flex-col justify-center items-center bg-[#FAF8F5] z-20">',
+      '            <div className="relative w-20 h-20 flex items-center justify-center">',
+      '              <svg className="w-full h-full transform -rotate-90">',
+      '                <circle cx="40" cy="40" r="34" stroke="#E8E3DD" strokeWidth="3" fill="transparent" />',
+      '                <circle cx="40" cy="40" r="34" stroke="#B2000A" strokeWidth="3" fill="transparent" strokeDasharray={2 * Math.PI * 34} strokeDashoffset={(2 * Math.PI * 34) * (1 - progress / 100)} className="transition-all duration-300" />',
+      '              </svg>',
+      '              <span className="absolute text-xs font-semibold text-[#2b2b2b]">{progress}%</span>',
+      '            </div>',
+      '            <span className="text-xs text-[#8b8b8b] uppercase tracking-[0.2em] mt-4">Loading Mobile Walkthrough...</span>',
+      '          </div>',
+      '        )}',
+      '      </div>',
+      '    </section>',
+      '  );',
+      '}',
+    ].join('\n')
+  },
+  {
+    label: 'SmoothScroll.tsx',
+    code: [
+      '"use client";',
+      '',
+      'import React, { useEffect } from \'react\';',
+      'import Lenis from \'lenis\';',
+      '',
+      'interface SmoothScrollProps {',
+      '  children: React.ReactNode;',
+      '}',
+      '',
+      'export default function SmoothScroll({ children }: SmoothScrollProps) {',
+      '  useEffect(() => {',
+      '    const lenis = new Lenis({',
+      '      duration: 1.2,',
+      '      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),',
+      '      orientation: \'vertical\',',
+      '      smoothWheel: true,',
+      '    });',
+      '',
+      '    function raf(time: number) {',
+      '      lenis.raf(time);',
+      '      requestAnimationFrame(raf);',
+      '    }',
+      '',
+      '    requestAnimationFrame(raf);',
+      '',
+      '    return () => {',
+      '      lenis.destroy();',
+      '    };',
+      '  }, []);',
+      '',
+      '  return <>{children}</>;',
+      '}',
+    ].join('\n')
   }
 ];
 
